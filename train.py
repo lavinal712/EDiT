@@ -169,7 +169,7 @@ def main(args=None):
 
             if train_steps % args.ckpt_every == 0 and train_steps > 0:
                 checkpoint = {
-                    "model": model.module.state_dict(),
+                    "model": model.state_dict(),
                     "ema": ema.state_dict(),
                     "opt": opt.state_dict(),
                     "args": args
