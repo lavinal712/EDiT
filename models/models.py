@@ -21,7 +21,7 @@ class EDiTBlock(nn.Module):
         self.mlp = Mlp(in_features=hidden_size, hidden_features=mlp_hidden_dim, act_layer=approx_gelu, drop=0)
         self.scale_shift_table = nn.Parameter(torch.randn(6, hidden_size) / hidden_size ** 0.5)
 
-    def forward(self, x, y, t, mask=None, **kwargs):
+    def forward(self, x, t, y, mask=None, **kwargs):
         B, N, C = x.shape
         shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = (self.scale_shift_table[None] + t.reshape(B, 6, -1)).chunk(6, dim=1)
         x = x + gate_msa * self.attn1(modulate(self.norm1(x), shift_msa, scale_msa))
@@ -58,7 +58,7 @@ class EDiT(nn.Module):
         num_patches = self.x_embedder.num_patches
         self.pos_embed = nn.Parameter(torch.zeros(1, num_patches, hidden_size), requires_grad=False)
 
-        self.t_block = nn.Sequential(
+        self.adaLN_modulation = nn.Sequential(
             nn.SiLU(),
             nn.Linear(hidden_size, 6 * hidden_size, bias=True)
         )
@@ -85,14 +85,14 @@ class EDiT(nn.Module):
 
         nn.init.normal_(self.t_embedder.mlp[0].weight, std=0.02)
         nn.init.normal_(self.t_embedder.mlp[2].weight, std=0.02)
-        nn.init.normal_(self.t_block[1].weight, std=0.02)
+        nn.init.normal_(self.adaLN_modulation[1].weight, std=0.02)
 
         nn.init.normal_(self.y_embedder.y_proj.fc1.weight, std=0.02)
         nn.init.normal_(self.y_embedder.y_proj.fc2.weight, std=0.02)
 
         for block in self.blocks:
-            nn.init.constant_(block.cross_attn.proj.weight, 0)
-            nn.init.constant_(block.cross_attn.proj.bias, 0)
+            nn.init.constant_(block.attn2.proj.weight, 0)
+            nn.init.constant_(block.attn2.proj.bias, 0)
 
         nn.init.constant_(self.final_layer.linear.weight, 0)
         nn.init.constant_(self.final_layer.linear.bias, 0)
@@ -111,17 +111,8 @@ class EDiT(nn.Module):
     def forward(self, x, timestep, y, mask=None, **kwargs):
         x = self.x_embedder(x) + self.pos_embed
         t = self.t_embedder(timestep)
-        t0 = self.t_block(t)
+        t0 = self.adaLN_modulation(t)
         y = self.y_embedder(y, self.training)
-
-        if mask is not None:
-            assert mask.shape[0] == y.shape[0]
-            mask = mask.squeeze(1).squeeze(1)
-            y = y.squeeze(1).masked_select(mask.unsqueeze(-1) != 0).view(1, -1, x.shape[-1])
-            mask = mask.sum(dim=1).tolist()
-        else:
-            mask = [y.shape[2]] * y.shape[0]
-            y = y.squeeze(1).view(1, -1, x.shape[-1])
 
         for block in self.blocks:
             x = block(x, t0, y, mask, **kwargs)
