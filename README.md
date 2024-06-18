@@ -9,8 +9,8 @@ EDiT adopts SDXL-VAE and CLIP to encode images and text.
 
 This repository contains:
 
-- A simple PyTorch implementation of EDiT
-- Training script on ImageNet with text rather than label.
+- 🪐 A simple PyTorch implementation of EDiT
+- 🛸 Training script on ImageNet with text prompt.
 
 ## Setup
 
@@ -21,14 +21,13 @@ Please refer to DiT and PixArt-α.
 ### Training EDiT
 
 ```bash
-python train.py --data_path /path/to/ImageNet/train
+accelerate launch --mixed_precision fp16 train.py --data_path /path/to/ImageNet/train
 ```
 
 ## TODO
 
 - [x] Support text prompt for DiT
-- [ ] Training script using [accelerate](https://github.com/huggingface/accelerate)
-- [ ] Initialize model with DiT weights
+- [x] Training script using [accelerate](https://github.com/huggingface/accelerate)
 - [ ] [Gradio](https://www.gradio.app/) for inference
 
 ## Acknowledgments

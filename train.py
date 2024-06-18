@@ -4,6 +4,7 @@ import os
 import torch
 import torch.distributed as dist
 from accelerate import Accelerator
+from accelerate.utils import set_seed
 from collections import OrderedDict
 from copy import deepcopy
 from diffusers.models import AutoencoderKL
@@ -79,22 +80,22 @@ def parse_args(input_args=None):
 def main(args=None):
     assert torch.cuda.is_available(), "Training currently requires at least one GPU."
 
-    device = torch.device("cuda")
-    seed = args.seed
-    torch.manual_seed(seed)
+    accelerator = Accelerator()
+    device = accelerator.device
+    set_seed(args.seed)
 
-    os.makedirs(args.results_dir, exist_ok=True)
-    experiment_index = len(glob(f"{args.results_dir}/*"))
-    model_string_name = args.model.replace("/", "-")
-    experiment_dir = f"{args.results_dir}/{experiment_index:03d}-{model_string_name}"
-    checkpoint_dir = f"{experiment_dir}/checkpoints"
-    os.makedirs(checkpoint_dir, exist_ok=True)
+    if accelerator.is_main_process:
+        os.makedirs(args.results_dir, exist_ok=True)
+        experiment_index = len(glob(f"{args.results_dir}/*"))
+        model_string_name = args.model.replace("/", "-")
+        experiment_dir = f"{args.results_dir}/{experiment_index:03d}-{model_string_name}"
+        checkpoint_dir = f"{experiment_dir}/checkpoints"
+        os.makedirs(checkpoint_dir, exist_ok=True)
 
     assert args.image_size % 8 == 0, "Image size must be divisible by 8 (for the VAE encoder)."
     latent_size = args.image_size // 8
     model = EDiT_models[args.model](
         input_size=latent_size,
-        num_classes=args.num_classes
     )
     ema = deepcopy(model).to(device)
     requires_grad(ema, False)
@@ -107,6 +108,8 @@ def main(args=None):
     requires_grad(text_encoder, False)
     with open("data/imagenet1000_clsidx_to_labels.txt", "r") as f:
         id2label = eval(f.read())
+    if accelerator.is_main_process:
+        print(f"EDiT Parameters: {sum(p.numel() for p in model.parameters()):,}")
 
     opt = torch.optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0)
 
@@ -129,6 +132,7 @@ def main(args=None):
     update_ema(ema, model, decay=0)
     model.train()
     ema.eval()
+    model, opt, loader = accelerator.prepare(model, opt, loader)
 
     train_steps = 0
     log_steps = 0
@@ -139,7 +143,7 @@ def main(args=None):
         for x, y in loader:
             x = x.to(device)
             with torch.no_grad():
-                x = vae.encode(x).latent_dist.sample().mul_(0.18215)
+                x = vae.encode(x).latent_dist.sample().mul_(vae.config.scaling_factor)
                 y = list(map(lambda id: id2label[int(id)], y))
                 y_inputs = tokenizer(y, padding="max_length", max_length=tokenizer.model_max_length, return_tensors="pt")
                 tokens = y_inputs["input_ids"].to(device)
@@ -150,7 +154,7 @@ def main(args=None):
             loss_dict = diffusion.training_losses(model, x, t, model_kwargs)
             loss = loss_dict["loss"].mean()
             opt.zero_grad()
-            loss.backward()
+            accelerator.backward(loss)
             opt.step()
             update_ema(ema, model)
 
@@ -162,7 +166,8 @@ def main(args=None):
                 steps_per_sec = log_steps / (end_time - start_time)
                 avg_loss = torch.tensor(running_loss / log_steps, device=device)
                 avg_loss = avg_loss.item()
-                print(f"(step={train_steps:07d}) Train Loss: {avg_loss:.4f}, Train Steps/Sec: {steps_per_sec:.2f}")
+                if accelerator.is_main_process:
+                    print(f"(step={train_steps:07d}) Train Loss: {avg_loss:.4f}, Train Steps/Sec: {steps_per_sec:.2f}")
                 running_loss = 0
                 log_steps = 0
                 start_time = time()
