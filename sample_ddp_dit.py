@@ -66,6 +66,7 @@ def main(args):
     model.eval()  # important!
     diffusion = create_diffusion(str(args.num_sampling_steps))
     vae = AutoencoderKL.from_pretrained(f"stabilityai/sd-vae-ft-{args.vae}").to(device)
+    scale = vae.config.scaling_factor
     assert args.cfg_scale >= 1.0, "In almost all cases, cfg_scale be >= 1.0"
     using_cfg = args.cfg_scale > 1.0
 
@@ -117,7 +118,7 @@ def main(args):
         if using_cfg:
             samples, _ = samples.chunk(2, dim=0)  # Remove null class samples
 
-        samples = vae.decode(samples / 0.18215).sample
+        samples = vae.decode(samples / scale).sample
         samples = torch.clamp(127.5 * samples + 128.0, 0, 255).permute(0, 2, 3, 1).to("cpu", dtype=torch.uint8).numpy()
 
         # Save samples to disk as individual .png files

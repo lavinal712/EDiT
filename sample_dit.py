@@ -36,6 +36,7 @@ def main(args):
     model.eval()  # important!
     diffusion = create_diffusion(str(args.num_sampling_steps))
     vae = AutoencoderKL.from_pretrained(f"stabilityai/sd-vae-ft-{args.vae}").to(device)
+    scale = vae.config.scaling_factor
 
     # Labels to condition the model with (feel free to change):
     class_labels = [207, 360, 387, 974, 88, 979, 417, 279]
@@ -56,7 +57,7 @@ def main(args):
         model.forward_with_cfg, z.shape, z, clip_denoised=False, model_kwargs=model_kwargs, progress=True, device=device
     )
     samples, _ = samples.chunk(2, dim=0)  # Remove null class samples
-    samples = vae.decode(samples / 0.18215).sample
+    samples = vae.decode(samples / scale).sample
 
     # Save and display images:
     save_image(samples, "sample.png", nrow=4, normalize=True, value_range=(-1, 1))
