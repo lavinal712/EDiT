@@ -3,6 +3,7 @@ import os
 import time
 from copy import deepcopy
 from glob import glob
+from time import time
 
 import torch
 from accelerate import Accelerator
@@ -41,8 +42,6 @@ def main(args):
         os.makedirs(checkpoint_dir, exist_ok=True)
         logger = create_logger(experiment_dir)
         logger.info(f"Experiment directory created at {experiment_dir}")
-    else:
-        logger = create_logger(None)
 
     # Create model:
     assert args.image_size % 8 == 0, "Image size must be divisible by 8 (for the VAE encoder)."
@@ -81,7 +80,7 @@ def main(args):
         drop_last=True
     )
     if accelerator.is_main_process:
-        logger.info(f"Dataset contains {len(dataset):,} images ({args.feature_path})")
+        logger.info(f"Dataset contains {len(dataset):,} images ({args.data_path if not is_custom else args.features_path})")
 
     # Prepare models for training:
     update_ema(ema, model, decay=0)  # Ensure EMA is initialized with synced weights
