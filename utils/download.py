@@ -13,7 +13,7 @@ import torch
 from torchvision.datasets.utils import download_url
 
 
-pretrained_models = {'DiT-XL-2-512x512.pt', 'DiT-XL-2-256x256.pt', 'SiT-XL-2-256x256.pt'}
+pretrained_models = {'DiT-XL-2-512x512.pt', 'DiT-XL-2-256x256.pt', 'SiT-XL-2-256x256.pt', 'last.pt'}
 
 
 def find_model(model_name):
@@ -43,6 +43,9 @@ def download_model(model_name):
             download_url(web_path, 'pretrained_models')
         elif 'SiT' in model_name:
             web_path = f'https://www.dl.dropboxusercontent.com/scl/fi/as9oeomcbub47de5g4be0/SiT-XL-2-256.pt?rlkey=uxzxmpicu46coq3msb17b9ofa&dl=0'
+            download_url(web_path, 'pretrained_models', filename=model_name)
+        elif 'last.pt' in model_name: # REPA
+            web_path = f'https://www.dl.dropboxusercontent.com/scl/fi/cxedbs4da5ugjq5wg3zrg/last.pt?rlkey=8otgrdkno0nd89po3dpwngwcc&st=apcc645o&dl=0'
             download_url(web_path, 'pretrained_models', filename=model_name)
     model = torch.load(local_path, map_location=lambda storage, loc: storage)
     return model
