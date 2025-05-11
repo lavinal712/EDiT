@@ -15,7 +15,7 @@ This repository provides code for training **<font color="#7799CC">Diffusion Tra
 | [DiT](https://github.com/facebookresearch/DiT) | ✅ | ✅ |
 | [SiT](https://github.com/willisma/SiT) | ✅ | ✅ |
 | [REPA](https://github.com/sihyun-yu/REPA) | ✅ | ✅ |
-| [Large-DiT](https://github.com/Alpha-VLLM/LLaMA2-Accessory/tree/main/Large-DiT-ImageNet) | ❌ | ✅ |
+| [Large-DiT](https://github.com/Alpha-VLLM/LLaMA2-Accessory/tree/main/Large-DiT-ImageNet) | ✅ | ✅ |
 
 ## Getting Started
 
