@@ -107,8 +107,6 @@ def main(args):
     else:
         raise ValueError(f"Invalid transform: {args.transform}")
     dataset = ImageFolder(args.source, transform=transform)
-    from torch.utils.data import Subset
-    dataset = Subset(dataset, range(100))
     sampler = DistributedSampler(
         dataset,
         num_replicas=dist.get_world_size(),
